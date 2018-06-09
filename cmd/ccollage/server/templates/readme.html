@@ -1,0 +1,98 @@
+<html>
+    <head>
+        <title>
+            CCollage — contributor collages for Git repositories
+        </title>
+        <style>
+            .flash-message {
+                background-color: #f0ffff;
+                margin: 0;
+                padding: 1rem;
+                text-align: center;
+            }
+            header {
+                display: flex;
+                align-items: center;
+            }
+            header .tagline {
+                padding: 0 0.7rem;
+                color: #777;
+                font-size: 1.2rem;
+                font-weight: bold;
+            }
+            body {
+                background-color: #fefefe;
+                font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif;
+                color: #1c1c1c;
+                max-width: 700px;
+                margin: 0 auto;
+            }
+            p {
+                font-size: 1rem;
+                line-height: 1.25;
+            }
+            code {
+                background-color: #f5f5f5;
+                color: #000;
+                padding: 0.2rem 0.3rem;
+                font-family: Inconsolata, Consolas, "Andale Mono WT", "Andale Mono", "Lucida Mono", "Lucida Sans Typewriter", "DejaVu Sans Mono", "Bitstream Vera Sans Mono", "Liberation Mono", "Nimbus Mono L", Monaco, "Courier New", Courier, monospace;
+                font-size: 1em;
+            }
+            pre {
+                overflow-x: scroll;
+            }
+            table {
+                border-collapse: collapse;
+                margin: 0 auto;
+            }
+            th, td {
+                border: #eee 1px solid;
+                padding: 0.7rem;
+            }
+            td.parameter {
+                text-align: center;
+            }
+            footer {
+                margin-top: 1rem;
+                padding-top: 1rem;
+                font-size: 0.8rem;
+                text-align: center;
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <h1>CCollage</h1>
+            <p class="tagline">Contributor collages for Git repositories</p>
+        </header>
+        {{ if ne .FlashMessage "" }}<p class="flash-message">{{ .FlashMessage }}</p>{{end}}
+        <p>CCollage generates SVG collages of a Git repository's contributors.</p>
+        <p>GitHub is supported. GitLab and BitBucket support might be added eventually.</p>
+        <h2>Usage</h2>
+        <p>Just add the repository URL and <code>contributors.svg</code> to the end of the domain name, like this:</p>
+        <pre><code>https://ccollage.vc.sg/github.com/valentine/ccollage/contributors.svg</code></pre>
+        <h3>Parameters</h3>
+        <p>CCollage supports parameters in the query string to customise the generated SVG image. All parameters are optional.</p>
+        <p>For example:</p>
+        <pre><code>https://ccollage.vc.sg/github.com/valentine/ccollage/contributors.svg?s=100&p=7&w=700</code></pre>
+        <table>
+            <tr>
+                <th>Parameter Name</th>
+                <th>Description</th>
+            </tr>
+            <tr>
+                <td class="parameter"><code>s</code> / <code>size</code></td>
+                <td>Size of the contributor avatars, in pixels. Defaults to 80px.</td>
+            </tr>
+            <tr>
+                <td class="parameter"><code>p</code> / <code>padding</code></td>
+                <td>Padding between each contributor avatar, in pixels. Defaults to 5px.</td>
+            </tr>
+            <tr>
+                <td class="parameter"><code>w</code> / <code>width</code></td>
+                <td>Maximum width of the generated image, in pixels. Defaults to 800px.</td>
+            </tr>
+        </table>
+        <footer>Copyright &copy; 2018 Valentine C. Licensed under the AGPL v3.</footer>
+    </body>
+</html>
