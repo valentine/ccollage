@@ -38,6 +38,7 @@ func ghHandler(w http.ResponseWriter, r *http.Request) {
 			c, err := github.GetAllContributors(owner, repo)
 			if err != nil {
 				buf = parseTemplate(fmt.Sprintln(err))
+				w.WriteHeader(http.StatusBadGateway) // 502
 				w.Write(buf.Bytes())
 				return
 			}
@@ -48,9 +49,11 @@ func ghHandler(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "image/svg+xml")
 		} else {
 			buf = parseTemplate("Please provide a valid URL.")
+			w.WriteHeader(http.StatusBadRequest) // 400
 		}
 	default:
 		buf = parseTemplate("Please add <code>contributors.svg</code> to the end of the URL.")
+		w.WriteHeader(http.StatusNotExtended) // 510
 		// log.Printf("ERROR: last part of the path needs to be a filename.")
 	}
 	w.Write(buf.Bytes())
@@ -79,6 +82,7 @@ func rateLimitHandler(w http.ResponseWriter, r *http.Request) {
 	rateTotal, rateLeft, resetTime, err := github.GetRateLimit()
 	if err != nil {
 		buf := parseTemplate(fmt.Sprintln(err))
+		w.WriteHeader(http.StatusBadGateway) // 502
 		w.Write(buf.Bytes())
 		return
 	}
