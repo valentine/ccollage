@@ -2,7 +2,7 @@
 package main
 
 import (
-	"github.com/valentine/ccollage/cmd/ccollage/server"
+	"ccollage/server"
 )
 
 func main() {

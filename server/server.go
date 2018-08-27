@@ -3,7 +3,6 @@ package server
 
 import (
 	"bytes"
-	"flag"
 	"fmt"
 	"html/template"
 	"log"
@@ -13,12 +12,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shurcooL/httpfs/html/vfstemplate"
-	"github.com/valentine/ccollage/cmd/ccollage/svg"
-	"github.com/valentine/ccollage/internal/client/github"
-)
+	"ccollage/svg"
 
-var serverPort int
+	"ccollage/internal/client/github"
+
+	"github.com/shurcooL/httpfs/html/vfstemplate"
+)
 
 func ghHandler(w http.ResponseWriter, r *http.Request) {
 	u := r.URL.Path
@@ -35,7 +34,7 @@ func ghHandler(w http.ResponseWriter, r *http.Request) {
 			var owner = su[2]
 			var repo = su[3]
 
-			c, err := github.GetAllContributors(owner, repo)
+			c, err := github.GetAllContributors(owner, repo, r)
 			if err != nil {
 				buf = parseTemplate(fmt.Sprintln(err))
 				w.WriteHeader(http.StatusBadGateway) // 502
@@ -79,7 +78,7 @@ func readmeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func rateLimitHandler(w http.ResponseWriter, r *http.Request) {
-	rateTotal, rateLeft, resetTime, err := github.GetRateLimit()
+	rateTotal, rateLeft, resetTime, err := github.GetRateLimit(r)
 	if err != nil {
 		buf := parseTemplate(fmt.Sprintln(err))
 		w.WriteHeader(http.StatusBadGateway) // 502
@@ -91,7 +90,7 @@ func rateLimitHandler(w http.ResponseWriter, r *http.Request) {
 	diff := rt.Sub(time.Now())
 	difft := diff.Truncate(time.Second)
 
-	buf := parseTemplate(fmt.Sprintf("API limit remaining: %d/%d; %+v before reset", rateLeft, rateTotal, difft))
+	buf := parseTemplate(fmt.Sprintf("API limit remaining: %d/%d; %+v before reset.", rateLeft, rateTotal, difft))
 	w.Write(buf.Bytes())
 }
 
@@ -143,24 +142,10 @@ func parseQueries(q url.Values) (width int, padding int, maxWidth int) {
 	return width, padding, maxWidth
 }
 
-func init() {
-	flag.IntVar(&serverPort, "port", 8080, "Port to listen on.")
-}
-
 // Serve starts the web server
 func Serve() {
-	flag.Parse()
-
-	s := &http.Server{
-		Addr:         fmt.Sprintf(":%d", serverPort),
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		IdleTimeout:  120 * time.Second,
-	}
-
 	http.HandleFunc("/github.com/", ghHandler)
 	http.HandleFunc("/ratelimit", rateLimitHandler)
 	//	http.HandleFunc("/gitlab.com/", glHandler)
 	http.HandleFunc("/", readmeHandler)
-	s.ListenAndServe()
 }

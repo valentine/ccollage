@@ -17,9 +17,12 @@
 package main
 
 import (
-	"github.com/valentine/ccollage/cmd/ccollage/server"
+	"ccollage/server"
+
+	"google.golang.org/appengine"
 )
 
 func main() {
 	server.Serve()
+	appengine.Main()
 }

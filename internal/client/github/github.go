@@ -10,13 +10,10 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
-	"github.com/die-net/lrucache"
-	"github.com/gregjones/httpcache"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/urlfetch"
 )
-
-var cachingClient *http.Client
 
 var ghToken, _ = os.LookupEnv("CCOLLAGE_GH_TOKEN")
 
@@ -26,14 +23,18 @@ type Contributor struct {
 	URL      string `json:"html_url"`
 }
 
-func accessGitHub(url string) ([]byte, http.Header, error) {
+func accessGitHub(url string, r *http.Request) ([]byte, http.Header, error) {
+	ctx := appengine.NewContext(r)
+
 	req, err := http.NewRequest("GET", url, nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; CCollage/0.0.1; +https://github.com/valentine/ccollage/)")
 
-	if ghToken != "" {
-		req.Header.Add("Authorization", fmt.Sprintf("token %s", ghToken))
-	}
+	// if ghToken != "" {
+	// 	req.Header.Set("Authorization", fmt.Sprintf("token %v", ghToken))
+	// }
 
-	response, err := cachingClient.Do(req)
+	client := urlfetch.Client(ctx)
+	response, err := client.Do(req)
 	if err != nil {
 		// log.Printf("ERROR: \n%+v", err.Error())
 		return nil, nil, err
@@ -56,8 +57,8 @@ func buildContributorURL(owner string, repo string) string {
 }
 
 // getContributors retrieves a list of contributor usernames from the repository link
-func getContributors(url string) ([]Contributor, error) {
-	resp, headers, err := accessGitHub(url)
+func getContributors(url string, r *http.Request) ([]Contributor, error) {
+	resp, headers, err := accessGitHub(url, r)
 	if err != nil {
 		return nil, fmt.Errorf("Error:<br /><code>%+v</code>", err.Error())
 	}
@@ -80,7 +81,7 @@ func getContributors(url string) ([]Contributor, error) {
 		for i := 2; i < p; i++ {
 			pageURL := fmt.Sprintf("%s?page=%d", url, i)
 
-			resp, _, err := accessGitHub(pageURL)
+			resp, _, err := accessGitHub(pageURL, r)
 			if err != nil {
 				return nil, fmt.Errorf("Error:<br /><code>%+v</code>", err.Error())
 			}
@@ -106,9 +107,9 @@ func getContributors(url string) ([]Contributor, error) {
 }
 
 // GetAllContributors takes a repo and its owner and gets the relevant user information except Full Name
-func GetAllContributors(owner string, repo string) ([]Contributor, error) {
+func GetAllContributors(owner string, repo string, r *http.Request) ([]Contributor, error) {
 	url := buildContributorURL(owner, repo)
-	c, err := getContributors(url)
+	c, err := getContributors(url, r)
 	if err != nil {
 		return c, err
 	}
@@ -127,7 +128,7 @@ func processHeaderLinkPages(headerLinks string) int {
 	return num
 }
 
-func GetRateLimit() (total int, remaining int, resettime int, err error) {
+func GetRateLimit(r *http.Request) (total int, remaining int, resettime int, err error) {
 	url := "https://api.github.com/rate_limit"
 
 	type RateLimit struct {
@@ -140,14 +141,16 @@ func GetRateLimit() (total int, remaining int, resettime int, err error) {
 		} `json:"resources"`
 	}
 
-	client := &http.Client{}
+	ctx := appengine.NewContext(r)
 
 	req, err := http.NewRequest("GET", url, nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; CCollage/0.0.1; +https://github.com/valentine/ccollage/)")
 
-	if ghToken != "" {
-		req.Header.Add("Authorization", fmt.Sprintf("token %s", ghToken))
-	}
+	// if ghToken != "" {
+	// 	req.Header.Set("Authorization", fmt.Sprintf("token %v", ghToken))
+	// }
 
+	client := urlfetch.Client(ctx)
 	response, err := client.Do(req)
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("GitHub sent a bad response:<br /><code>%+v</code>", err.Error())
@@ -159,10 +162,10 @@ func GetRateLimit() (total int, remaining int, resettime int, err error) {
 		return 0, 0, 0, fmt.Errorf("GitHub sent a bad response:<br /><code>%+v</code>", err.Error())
 	}
 
-	var r RateLimit
+	var rl RateLimit
 
 	if json.Valid(responseData) == true {
-		err := json.Unmarshal(responseData, &r)
+		err := json.Unmarshal(responseData, &rl)
 		if err != nil {
 			// log.Printf("ERROR: Unable to unmarshal JSON:\n%+v", string(responseData))
 			return 0, 0, 0, fmt.Errorf("GitHub sent a bad response:<br /><code>%+v</code>", string(responseData))
@@ -172,57 +175,13 @@ func GetRateLimit() (total int, remaining int, resettime int, err error) {
 		return 0, 0, 0, fmt.Errorf("GitHub sent a bad response:<br /><code>%+v</code>", string(responseData))
 	}
 
-	total = r.Resources.Core.Total
-	remaining = r.Resources.Core.Remaining
-	resettime = r.Resources.Core.ResetTime
+	total = rl.Resources.Core.Total
+	remaining = rl.Resources.Core.Remaining
+	resettime = rl.Resources.Core.ResetTime
 
 	if total == 0 && resettime == 0 {
 		return 0, 0, 0, fmt.Errorf("GitHub sent a bad response:<br /><code>%+v</code>", string(responseData))
 	}
 
 	return total, remaining, resettime, nil
-}
-
-type userAgentRoundTripper struct {
-	Transport http.RoundTripper
-}
-
-func (rt userAgentRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; CCollage/0.0.1; +https://github.com/valentine/ccollage/)")
-	return rt.Transport.RoundTrip(req)
-}
-
-// Initialises LRU cache with optional environment variables CCOLLAGE_GH_CACHE_SIZE and CCOLLAGE_GH_CACHE_MAXAGE.
-func init() {
-	var ok bool
-	var err error
-	var c, cacheSize, cacheAge int64
-	var cacheSizeStr, cacheAgeStr string
-
-	cacheSizeStr, ok = os.LookupEnv("CCOLLAGE_GH_CACHE_SIZE")
-	if !ok {
-		cacheSize = 1024 * 1024 * 20 // 20MB cache
-	} else {
-		c, err = strconv.ParseInt(cacheSizeStr, 10, 64)
-		if err != nil {
-			log.Printf("ERROR:\n%+v", err.Error())
-		}
-		cacheSize = c * 1024 * 1024
-	}
-	cacheAgeStr, ok = os.LookupEnv("CCOLLAGE_GH_CACHE_MAXAGE")
-	if !ok {
-		cacheAge = 60 * 60 * 24 * 7 // max-age of 7 days
-	} else {
-		c, err = strconv.ParseInt(cacheAgeStr, 10, 64)
-		if err != nil {
-			log.Printf("ERROR:\n%+v", err.Error())
-		}
-		cacheAge = c * 60
-	}
-
-	lruCache := lrucache.New(cacheSize, cacheAge)
-	cachingClient = &http.Client{
-		Timeout:   15 * time.Second,
-		Transport: userAgentRoundTripper{httpcache.NewTransport(lruCache)},
-	}
 }

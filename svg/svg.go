@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/valentine/ccollage/internal/client/github"
-	svgo "github.com/valentine/ccollage/third_party/svgo"
+	"ccollage/internal/client/github"
+
+	svgo "ccollage/third_party/svgo"
 )
 
 // BuildCollage takes a contributor array and returns a bytes buffer for use in the HTTP server
